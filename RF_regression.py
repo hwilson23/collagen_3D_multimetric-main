@@ -7,6 +7,7 @@ from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_squared_error, r2_score
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.inspection import permutation_importance
 
 
 
@@ -50,10 +51,23 @@ print(f"R-squared Score: {r2:.2f}")
 
 
 
+result = permutation_importance(
+    rf_regressor, X_test, y_test, n_repeats=20, random_state=42, n_jobs=2
+)
 
-importance = pd.Series(rf_regressor.feature_importances_, index=X.columns)
+#importance = pd.Series(rf_regressor.feature_importances_, index=X.columns)
+importance = pd.Series(result.importances_mean, index=X.columns)
 importance = importance.sort_values(ascending=False)
 importance.plot(kind='barh')
 plt.show()
+
+fig, ax = plt.subplots()
+importance.plot.bar(yerr=result.importances_std, ax=ax)
+ax.set_title("Feature importances using permutation on full model")
+ax.set_ylabel("Mean accuracy decrease")
+fig.tight_layout()
+plt.show()
+
+
 print("Done :)")
 
