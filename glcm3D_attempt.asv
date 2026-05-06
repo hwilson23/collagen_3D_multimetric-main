@@ -6,7 +6,7 @@
 
 OPT.D = 1;                  % distance for offset computation
 OPT.NeighborSize = 1;       % neighborhood radius
-OPT.quantLevel = 16;        % number of gray level bins 
+OPT.quantLevel = 8;        % number of gray level bins 
 OPT.glcm_properties = {'autoc','contr','corrm','corrp','cprom','cshad','dissi','energ','entro','homom','homop','maxpr','sosvh','savgh','svarh','senth','dvarh','denth','inf1h','inf2h','indnc','idmnc'};  % features to compute
 %folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata";
 folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\test_groundtruthdata";
@@ -48,46 +48,47 @@ for i=1:length(filenames)
     [d1,d2,d3] = ind2sub(size(mask), find(mask));
     InsideRange = [min(d1) max(d1);min(d2) max(d2);min(d3) max(d3)];
     origsize = size(volimg);
-    mask = mask(InsideRange(1,1):InsideRange(1,2),InsideRange(2,1):InsideRange(2,2),InsideRange(3,1):InsideRange(3,2));
+    partialmask = mask(InsideRange(1,1):InsideRange(1,2),InsideRange(2,1):InsideRange(2,2),InsideRange(3,1):InsideRange(3,2));
     volimg = volimg(InsideRange(1,1):InsideRange(1,2),InsideRange(2,1):InsideRange(2,2),InsideRange(3,1):InsideRange(3,2));
     %disp(size(mask));
     [~,justname,~] = fileparts(filenames(i));
     glcmFile = fullfile(outpath,string([char(justname) '_3D_D' num2str(OPT.D) '_N' num2str(OPT.NeighborSize) '_Q' num2str(OPT.quantLevel) '.mat'])); 
     disp('gclmfile')
     disp(glcmFile)
+    
     if (exist(string(glcmFile), 'file') == 2)
         GLCMS = load(glcmFile);
         GLCMS = GLCMS.GLCMS;
     else
-        GLCMS = CreateGLCM_Local(volimg,OPT.quantLevel,[0 1],OPT.D,OPT.NeighborSize,mask); 
-        save(glcmFile,'GLCMS');
+        GLCMS = CreateGLCM_Local(volimg,OPT.quantLevel,[0 1],OPT.D,OPT.NeighborSize,partialmask); 
+        save(glcmFile,'GLCMS',"-v7.3");
     end
-    texture = computeGLCMLocalFeat(GLCMS,mask,OPT.glcm_properties);        
+    texture = computeGLCMLocalFeat(GLCMS,partialmask,OPT.glcm_properties);        
     time_total = toc(timerStart);
     fprintf('Total time: %2.2f\n',time_total);
      
     for prop=1:length(OPT.glcm_properties)
         img = squeeze(texture(:,:,:,prop));      
-        img = (img-min(img(:)));
-        img(~mask) = 0;
-        vol.img = zeros(size(origsize));
-        vol.img(InsideRange(1,1):InsideRange(1,2),InsideRange(2,1):InsideRange(2,2),InsideRange(3,1):InsideRange(3,2)) = img;
-        vol.img(double(mask)==0) = 0;
-        vol.hdr.dime.glmax = max(img(:));
-        vol.hdr.dime.glmin = min(img(:));
-        vol.hdr.hist.descrip = 'Texture';
+        %img = (img-min(img(:))); i think no needed with mat2gray
+        img = (65535*mat2gray(img));
+        fullimg = zeros(origsize);
+        fullimg(InsideRange(1,1):InsideRange(1,2),InsideRange(2,1):InsideRange(2,2),InsideRange(3,1):InsideRange(3,2)) = img;
+        %fullimg(double(mask)==0) = 0;
+        fullimg = uint16(fullimg); %scaling to make sure small values not wiped
         TextureFileName  = [justname '_' OPT.glcm_properties{prop} '_3D_D' num2str(OPT.D) '_N' num2str(OPT.NeighborSize) '_Q' num2str(OPT.quantLevel) '.tif'];
         for z = 1:length(img(1,1,:))
+            slice = fullimg(:,:,z);
             if z ==1
-                imwrite(uint16(vol.img(:,:,z)),fullfile(outpath,join(TextureFileName)));
+                imwrite(uint16(slice),fullfile(outpath,join(TextureFileName)));
             else
-                imwrite(uint16(vol.img(:,:,z)),fullfile(outpath,join(TextureFileName)),'WriteMode','append')
+                imwrite(uint16(slice),fullfile(outpath,join(TextureFileName)),'WriteMode','append')
             
             end
         end
         
+        
     end
-
+    disp("files saved!")
     
 end
 
@@ -120,6 +121,7 @@ for i=1:size(glcm,1)
             glcm_norm = squeeze(glcm(i,j,k,:,:));            
             st = computeFeature(glcm_norm,GLCM_feat); 
             texture(i,j,k,:) = st;
+            
         end
     end
     fprintf(repmat('\b',1,n));
@@ -321,7 +323,7 @@ for ofst=1:size(Offsets,1)
         isInMask2 = mask(IND_ns);
         isInMask(isInMask) = isInMask2;
         OffsetsMatrixS(isInMask,ofst,nb+1) = IND_ns(isInMask2);
-        %Check weather it is masked
+        %Check if masked
         Y_ne = Y_e+NeighborOffset(1);
         X_ne = X_e+NeighborOffset(2);
         Z_ne = Z_e+NeighborOffset(3);
