@@ -1,11 +1,11 @@
 # collagen_3D_multimetric
 
 # combining multiple software outputs for collagen analysis
-workflow for aggregating collagen data from several sources (CurveAlign, TWOMBLI, texture) and parsing
-parse_into_dataframe_NOslices.py aggregrates data by stack
-parse_into_dataframe_YESslices.py aggregrates data per image slice (also has the 3D glcm functions)
-fanalyze_dataframe.ipynb runs test plots on exported full .csv dataframe
-RF_regression.py trains random forest regressor on .csv dataframe to separate given condition and ranks importance of features (assembled from the different software outputs)
+-workflow for aggregating collagen data from several sources (CurveAlign, TWOMBLI, texture) and parsing
+-parse_into_dataframe_NOslices.py aggregrates data by stack
+-parse_into_dataframe_YESslices.py aggregrates data per image slice (also has the 3D glcm functions)
+-fanalyze_dataframe.ipynb runs test plots on exported full .csv dataframe
+-RF_regression.py trains random forest regressor on .csv dataframe to separate given condition and ranks importance of features (assembled from the different software outputs)
 
 spiral files are ground truth data that can be used for glcm comparisons and testing
 
