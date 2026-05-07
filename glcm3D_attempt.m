@@ -8,9 +8,9 @@ OPT.D = 1;                  % distance for offset computation
 OPT.NeighborSize = 1;       % neighborhood radius
 OPT.quantLevel = 8;        % number of gray level bins 
 OPT.glcm_properties = {'autoc','contr','corrm','corrp','cprom','cshad','dissi','energ','entro','homom','homop','maxpr','sosvh','savgh','svarh','senth','dvarh','denth','inf1h','inf2h','indnc','idmnc'};  % features to compute
-%folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata";
-folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\test_groundtruthdata";
-outpath = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\outputs";
+folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata";
+%folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\test_groundtruthdata";
+outpath = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\texture_3d_matlab";
 cd(folder)
 %load file
 
@@ -50,7 +50,7 @@ for i=1:length(filenames)
     origsize = size(volimg);
     partialmask = mask(InsideRange(1,1):InsideRange(1,2),InsideRange(2,1):InsideRange(2,2),InsideRange(3,1):InsideRange(3,2));
     volimg = volimg(InsideRange(1,1):InsideRange(1,2),InsideRange(2,1):InsideRange(2,2),InsideRange(3,1):InsideRange(3,2));
-    %disp(size(mask));
+    %disp(unique(volimg));
     [~,justname,~] = fileparts(filenames(i));
     glcmFile = fullfile(outpath,string([char(justname) '_3D_D' num2str(OPT.D) '_N' num2str(OPT.NeighborSize) '_Q' num2str(OPT.quantLevel) '.mat'])); 
     disp('gclmfile')
@@ -60,7 +60,7 @@ for i=1:length(filenames)
         GLCMS = load(glcmFile);
         GLCMS = GLCMS.GLCMS;
     else
-        GLCMS = CreateGLCM_Local(volimg,OPT.quantLevel,[0 1],OPT.D,OPT.NeighborSize,partialmask); 
+        GLCMS = CreateGLCM_Local(volimg,OPT.quantLevel,[min(volimg(:)) max(volimg(:))],OPT.D,OPT.NeighborSize,partialmask); 
         save(glcmFile,'GLCMS',"-v7.3");
     end
     texture = computeGLCMLocalFeat(GLCMS,partialmask,OPT.glcm_properties);        
@@ -68,13 +68,15 @@ for i=1:length(filenames)
     fprintf('Total time: %2.2f\n',time_total);
      
     for prop=1:length(OPT.glcm_properties)
-        img = squeeze(texture(:,:,:,prop));      
-        %img = (img-min(img(:))); i think not needed with mat2gray
-        img = (65535*mat2gray(img));
+        img = squeeze(texture(:,:,:,prop)); 
+        img = (img-min(img(:))); %shift to not negative
+        img = img/max(img(:))*65535;
+        %disp(unique(img))
+        %disp(unique(img))
         fullimg = zeros(origsize);
         fullimg(InsideRange(1,1):InsideRange(1,2),InsideRange(2,1):InsideRange(2,2),InsideRange(3,1):InsideRange(3,2)) = img;
         %fullimg(double(mask)==0) = 0;
-        fullimg = uint16(fullimg); %scaling to make sure small values not wiped
+        %fullimg = uint16(fullimg); %scaling to make sure small values not wiped
         TextureFileName  = [justname '_' OPT.glcm_properties{prop} '_3D_D' num2str(OPT.D) '_N' num2str(OPT.NeighborSize) '_Q' num2str(OPT.quantLevel) '.tif'];
         for z = 1:length(img(1,1,:))
             slice = fullimg(:,:,z);
