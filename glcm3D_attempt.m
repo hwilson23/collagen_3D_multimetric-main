@@ -4,6 +4,10 @@
 
 %user input
 
+if isempty(gcp('nocreate'))
+    parpool('local');
+end
+
 OPT.D = 1;                  % distance for offset computation
 OPT.NeighborSize = 1;       % neighborhood radius
 OPT.quantLevel = 8;        % number of gray level bins 
@@ -19,7 +23,7 @@ filenames = {files.name};
 %disp({files.name})
 %mask file
 fprintf('Starting Time: %s\n',datestr(now));
-for i=1:length(filenames)
+parfor i=1:length(filenames)
     timerStart = tic;
     imgpg1 = imread(string(fullfile(folder,filenames(i))));
     disp(filenames(i))
@@ -61,7 +65,8 @@ for i=1:length(filenames)
         GLCMS = GLCMS.GLCMS;
     else
         GLCMS = CreateGLCM_Local(volimg,OPT.quantLevel,[min(volimg(:)) max(volimg(:))],OPT.D,OPT.NeighborSize,partialmask); 
-        save(glcmFile,'GLCMS',"-v7.3");
+        m = matfile(glcmFile,'writable', true);
+        m.GLCMS = GLCMS;
     end
     texture = computeGLCMLocalFeat(GLCMS,partialmask,OPT.glcm_properties);        
     time_total = toc(timerStart);
@@ -95,7 +100,7 @@ for i=1:length(filenames)
 end
 
 disp("saving files");
-
+delete(gcp('nocreate'));
 
 fprintf('End Time: %s\n',datestr(now));
 
