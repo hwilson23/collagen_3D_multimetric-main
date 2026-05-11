@@ -23,8 +23,9 @@ MATLAB implementation of voxelwise 3D Gray-Level Co-occurrence Matrix (GLCM) tex
 Derived from:
 - https://github.com/Pedram-Parnianpour/VGLCM-TOP-3D-Texture-Analysis
 - https://journals.plos.org/plosone/article?id=10.1371/journal.pone.0117759
+- claude (sonnet 4.6) used to help modify code.
 
-
+Requires:
 - **Image Processing Toolbox** 
 - **Parallel Computing Toolbox** 
 
