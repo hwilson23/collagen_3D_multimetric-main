@@ -1,7 +1,7 @@
 [project]
 name = "collagen-3d-multimetric-main"
 version = "0.1.0"
-description = "Add your description here"
+description = "analysis code for processing 3D collagen gel data, pipeline for collecting parameters from CurveAlign, TWOMBLI, and texture data"
 readme = "README.md"
 requires-python = ">=3.13"
 dependencies = [
