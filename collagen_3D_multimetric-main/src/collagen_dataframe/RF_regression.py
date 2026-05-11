@@ -4,7 +4,7 @@ import matplotlib.pyplot as plt
 from sklearn.tree import plot_tree
 from sklearn.model_selection import train_test_split
 from sklearn.ensemble import RandomForestRegressor
-from sklearn.metrics import mean_squared_error, r2_score
+from sklearn.metrics import mean_squared_error, r2_score, confusion_matrix, classification_report
 from sklearn.tree import DecisionTreeClassifier
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.inspection import permutation_importance
@@ -58,15 +58,19 @@ result = permutation_importance(
 #importance = pd.Series(rf_regressor.feature_importances_, index=X.columns)
 importance = pd.Series(result.importances_mean, index=X.columns)
 importance = importance.sort_values(ascending=False)
-importance.plot(kind='barh')
-plt.show()
 
 fig, ax = plt.subplots()
-importance.plot.bar(yerr=result.importances_std, ax=ax)
+importance.plot.barh(yerr=result.importances_std, ax=ax)
 ax.set_title("Feature importances using permutation on full model")
-ax.set_ylabel("Mean accuracy decrease")
+ax.set_xlabel("Mean accuracy decrease")
+ax.set_ylabel("Feature")
+
 fig.tight_layout()
+print("plots displaying")
+
 plt.show()
+
+
 
 
 print("Done :)")
