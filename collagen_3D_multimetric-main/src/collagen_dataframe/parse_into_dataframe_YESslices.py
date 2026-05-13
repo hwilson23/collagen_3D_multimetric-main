@@ -2,6 +2,7 @@ import os
 import numpy as np
 import pandas as pd
 import tifffile as tiff
+import itertools
 
 
 def load_csv(file, columns=None):
@@ -23,8 +24,8 @@ def reshape_CA(df):
 def reshape_texture(df):
     # List of all possible value columns
     possible_values = ["concentration",
-                       "type",
-                       "roi",
+                        "type",
+                        "roi",
                        "texture_mean",
                        "texture_median",
                        "texture_std", 
@@ -90,19 +91,20 @@ def image_stats_glcm3D(imagepath, stackstats):
     
     for z in range(img.shape[2]):
         currentim = img[:,:,z]
+        nospace_name = os.path.basename(imagepath).replace(" ","")
         imgstats = {
             "slice" : z+1,
-            "image_name": os.path.basename(imagepath)[:idx+len(".tif")],
-            "texture_type": os.path.basename(imagepath).split('_')[-4], 
-            "concentration": os.path.basename(imagepath).split('_')[2], 
-            "type": os.path.basename(imagepath).split('_')[1],
-            "roi": os.path.basename(imagepath).split('_')[3],
+            "image_name": nospace_name[:idx+len(".tif")],
+            "texture_type": nospace_name.split('_')[-4], 
+            "concentration": nospace_name.split('_')[2], 
+            "type": nospace_name.split('_')[1],
+            "roi": nospace_name.split('_')[3],
             "texture3d_mean": np.mean(currentim[currentim>0]),
             "texture3d_median": np.median(currentim[currentim>0]),
             "texture3d_std": np.std(currentim[currentim>0]),
-            "distance3d": os.path.basename(imagepath).split('_')[-3],
-            "neighbor3d": os.path.basename(imagepath).split('_')[-2],
-            "bin_num3d": os.path.basename(imagepath).split('_')[-1][-3],
+            "distance3d": nospace_name.split('_')[-3],
+            "neighbor3d": nospace_name.split('_')[-2],
+            "bin_num3d": nospace_name.split('_')[-1][-3],
         }
         stackstats.append(imgstats)
     return stackstats
@@ -135,6 +137,58 @@ def twombli_slice_data(df):
     df['image_name'] = df['image_name'].apply(extract_stack_key)
     print('TWOMBLI spreadsheet processed')
     return df
+
+def find_identical_columns(df):
+    identical_groups = []
+    checked = set()
+    
+    for col1, col2 in itertools.combinations(df.columns, 2):
+        if col1 in checked or col2 in checked:
+            continue
+        # Compare row-by-row, ignoring NaNs
+        if df[col1].equals(df[col2]):
+            # Check if these are already part of a group
+            added = False
+            for group in identical_groups:
+                if col1 in group or col2 in group:
+                    group.add(col1)
+                    group.add(col2)
+                    added = True
+                    break
+            if not added:
+                identical_groups.append({col1, col2})
+            checked.add(col2)  # mark col2 as a duplicate
+    
+    return identical_groups
+
+
+def collapse_identical_columns(df, groups):
+    df = df.copy()
+    dropped = []
+    renamed = []
+
+    for group in groups:
+        keep = min(group, key=len)          # the name to keep
+        dupes = group - {keep}              # all others to drop
+
+        # Rename the kept column to your chosen base name (optional)
+        base_name = keep  # or define your own logic here
+        df = df.rename(columns={keep: base_name})
+
+        # Drop the duplicates
+        df = df.drop(columns=list(dupes))
+        dropped.extend(dupes)
+        renamed.append((keep, base_name, dupes))
+
+    # Summary
+    print("Collapsed columns:")
+    for kept, new_name, dupes in renamed:
+        print(f"  Kept '{new_name}', dropped: {dupes}")
+
+    return df
+
+
+
 ##main
 
 dfCA = load_csv("G:/FluorescentCollagen/20260427_flucol_ows3/flucol_crops/ctFIREout/results_test_masked_min30/ctfire_stats_per_slice.csv")
@@ -146,7 +200,8 @@ dfTWOMBLI = twombli_slice_data(dfTWOMBLI)
 dftexture = process_img_folder("G:/FluorescentCollagen/20260427_flucol_ows3/20260427_texturemapdata/texturemap",is_3d = 0)
 dftexture= reshape_texture(dftexture)
 
-dftexture3D = process_img_folder("G:/FluorescentCollagen/20260427_flucol_ows3/20260427_texturemapdata/texture_3d_matlab_endedbeforedone",is_3d = 1)
+dftexture3D = process_img_folder("G:\\FluorescentCollagen\\20260427_flucol_ows3\\20260427_texturemapdata\\texture_3d_matlab",is_3d = 1)
+print(dftexture3D.head())
 dftexture3D = reshape_texture(dftexture3D)
 
 
@@ -164,22 +219,34 @@ fulldf = pd.merge(mostdf,dftexture3D, on=["image_name","slice"], how = "left")
 print(fulldf.head())
 print(fulldf.columns.values)
 
+
+groups = find_identical_columns(fulldf)
+if groups:
+    print(f"Found {len(groups)} group(s) of identical columns:")
+    for g in groups:
+        print(" ", g)
+    collapseddf = collapse_identical_columns(fulldf, groups)
+    print(collapseddf.columns.values)
+else:
+    print("No exactly identical columns found.")
+
+
 # Split into FLU and SHG dataframes if type column exists
-if 'type' in fulldf.columns:
-    fulldf_flu = fulldf[fulldf['type'].str.lower() == 'flu'].copy()
-    fulldf_shg = fulldf[fulldf['type'].str.lower() == 'shg'].copy()
+if 'type' in collapseddf.columns:
+    collapseddf_flu = collapseddf[collapseddf['type'].str.lower() == 'flu'].copy()
+    collapseddf_shg = collapseddf[collapseddf['type'].str.lower() == 'shg'].copy()
     
     #remove the _flu_ _shg_ part of the filename
-    fulldf_flu['short_image_name'] = fulldf_flu['image_name'].str.replace('_flu_', '_', regex=False)
-    fulldf_shg['short_image_name'] = fulldf_shg['image_name'].str.replace('_shg_', '_', regex=False)
-    print(f"FLU dataframe shape: {fulldf_flu.shape}")
-    print(f"SHG dataframe shape: {fulldf_shg.shape}")
+    collapseddf_flu['short_image_name'] = collapseddf_flu['image_name'].str.replace('_flu_', '_', regex=False)
+    collapseddf_shg['short_image_name'] = collapseddf_shg['image_name'].str.replace('_shg_', '_', regex=False)
+    print(f"FLU dataframe shape: {collapseddf_flu.shape}")
+    print(f"SHG dataframe shape: {collapseddf_shg.shape}")
     
     # Save separate files
-    fulldf_flu.to_csv("final_dataframe_byslice_FLU.csv", index=False)
-    fulldf_shg.to_csv("final_dataframe_byslice_SHG.csv", index=False)
+    collapseddf_flu.to_csv("final_dataframe_byslice_FLU.csv", index=False)
+    collapseddf_shg.to_csv("final_dataframe_byslice_SHG.csv", index=False)
     
     print("Saved FLU and SHG dataframes separately")
 
 # Also save the combined dataframe
-fulldf.to_csv("final_dataframe_byslice.csv", index=False)
+collapseddf.to_csv("finalcollapsed_dataframe_byslice.csv", index=False)
