@@ -61,7 +61,7 @@ def image_stats_glcm2D(imagepath, stackstats):
 
     #index of end filename
     idx = os.path.basename(imagepath).find("8bit")
-    #print(os.path.basename(imagepath)[:idx+8])
+    #print(os.path.basename(imagepath)[:idx+len("8bit.ome")])
     
     for z in range(img.shape[2]):
         currentim = img[:,:,z]
@@ -87,15 +87,16 @@ def image_stats_glcm3D(imagepath, stackstats):
        
 
     #index of end filename
-    idx = os.path.basename(imagepath).find("8bit.ome")
-    #print(os.path.basename(imagepath)[:idx+8])
+    idx = nospace_name.find("8bit.ome")
+    #print(nospace_name[:idx+len("8bit.ome")], nospace_name.split('_')[-5])
+   
     
     for z in range(img.shape[2]):
         currentim = img[:,:,z]
         imgstats = {
             "slice" : z+1,
             "image_name": nospace_name[:idx+len("8bit.ome")],
-            "texture_type": nospace_name.split('_')[-4], 
+            "texture_type": nospace_name.split('_')[-5], 
             "concentration": nospace_name.split('_')[2], 
             "type": nospace_name.split('_')[1],
             "roi": nospace_name.split('_')[3],
@@ -230,14 +231,17 @@ else:
     print("No exactly identical columns found.")
 
 
-# Split into FLU and SHG dataframes if type column exists
-if 'type' in collapseddf.columns:
-    collapseddf_flu = collapseddf[collapseddf['type'].str.lower() == 'flu'].copy()
-    collapseddf_shg = collapseddf[collapseddf['type'].str.lower() == 'shg'].copy()
+# Split into FLU and SHG dataframes if any type-like column exists
+type_columns = [col for col in collapseddf.columns if col.startswith('type')]
+if type_columns:
+    type_col = type_columns[0]
+    collapseddf_flu = collapseddf[collapseddf[type_col].str.lower() == 'flu'].copy()
+    collapseddf_shg = collapseddf[collapseddf[type_col].str.lower() == 'shg'].copy()
     
-    #remove the _flu_ _shg_ part of the filename
+    # remove the _flu_ _shg_ part of the filename
     collapseddf_flu['short_image_name'] = collapseddf_flu['image_name'].str.replace('_flu_', '_', regex=False)
     collapseddf_shg['short_image_name'] = collapseddf_shg['image_name'].str.replace('_shg_', '_', regex=False)
+    print(f"Using type column: {type_col}")
     print(f"FLU dataframe shape: {collapseddf_flu.shape}")
     print(f"SHG dataframe shape: {collapseddf_shg.shape}")
     
