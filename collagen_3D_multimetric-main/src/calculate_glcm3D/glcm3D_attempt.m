@@ -4,15 +4,16 @@
 
 %user input
 
-if isempty(gcp('nocreate'))
-    parpool('local');
-end
+%if isempty(gcp('nocreate'))
+ %   parpool('local');
+%end
 
 OPT.D = 1;                  % distance for offset computation
 OPT.NeighborSize = 1;       % neighborhood radius
 OPT.quantLevel = 8;        % number of gray level bins 
 OPT.glcm_properties = {'autoc','contr','corrm','corrp','cprom','cshad','dissi','energ','entro','homom','homop','maxpr','sosvh','savgh','svarh','senth','dvarh','denth','inf1h','inf2h','indnc','idmnc'};  % features to compute
-folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata";
+folder = 'G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\testbatch'
+%folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata";
 %folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\test_groundtruthdata";
 outpath = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\texture_3d_matlab";
 cd(folder)
@@ -23,7 +24,7 @@ filenames = {files.name};
 %disp({files.name})
 %mask file
 fprintf('Starting Time: %s\n',datestr(now));
-parfor i=1:length(filenames)
+for i=1:length(filenames)
     timerStart = tic;
     imgpg1 = imread(string(fullfile(folder,filenames(i))));
     disp(filenames(i))
@@ -100,7 +101,7 @@ parfor i=1:length(filenames)
 end
 
 disp("saving files");
-delete(gcp('nocreate'));
+%delete(gcp('nocreate'));
 
 fprintf('End Time: %s\n',datestr(now));
 
@@ -115,6 +116,48 @@ function offset = ComputeOffsets(dis)
     % offset = offset(1:size(offset,1)/2,:);
 end
 
+function texture = computeGLCMLocalFeat(glcm,mask,GLCM_feat)
+texture = zeros(size(glcm,1),size(glcm,2),size(glcm,3),length(GLCM_feat),'single');
+fprintf('Computing Features: ')
+[vi, vj, vk] = ind2sub(size(mask),find(mask));
+nVoxels = length(vi);
+featresults = zeros(nVoxels, length(GLCM_feat),'double');
+
+parfor v = 1:nVoxels
+    
+    glcm_norm = squeeze(glcm(vi(v),vj(v),vk(v),:,:));
+    featresults(v,:) = computeFeature(glcm_norm, GLCM_feat);
+end
+for v = 1:nVoxels
+    texture(vi(v),vj(v),vk(v),:) = featresults(v,:);
+end
+
+
+%%old version for gpu/regular cpu converting - without allocation for
+%%parfor
+%{
+for i=1:size(glcm,1)
+    for j=1:size(glcm,2)
+        for k=1:size(glcm,3)
+            if(mask(i,j,k)==0)
+                continue;
+            end
+            glcm_norm = gpuArray(squeeze(glcm(i,j,k,:,:)));            
+            st = computeFeature(glcm_norm,GLCM_feat); 
+            texture(i,j,k,:) = st;
+            
+        end
+    end
+    fprintf(repmat('\b',1,n));
+    msg = sprintf('%2.2f',i/size(glcm,1)*100);
+    disp([msg '%%']);
+    n=numel(msg)+1;                    
+end
+%}
+texture = gather(texture);
+disp("done with compute fetures")
+end
+%{
 function texture = computeGLCMLocalFeat(glcm,mask,GLCM_feat)
 texture = zeros(size(glcm,1),size(glcm,2),size(glcm,3),length(GLCM_feat),'single');
 fprintf('Computing Features: ')
@@ -138,7 +181,7 @@ for i=1:size(glcm,1)
 end
 fprintf('\n');
 end
-
+%}
 function feature = computeFeature(glcm,GLCM_feat_all)
     feature = zeros(length(GLCM_feat_all),1);
     size_glcm_1 = size(glcm,1); 
@@ -162,86 +205,87 @@ function feature = computeFeature(glcm,GLCM_feat_all)
     end 
     u_x = sum(sum(i.*Pij)); 
     u_y = sum(sum(j.*Pij));     
-    s_x = sum(sum(Pij.*((i-u_x).^2)))^0.5; 
-    s_y = sum(sum(Pij.*((j-u_y).^2)))^0.5; 
+    s_x = sum(sum(Pij.*((i-u_x).*(i-u_x))))^0.5; 
+    s_y = sum(sum(Pij.*((j-u_y).*(j-u_y))))^0.5; 
     
     for prop=1:length(GLCM_feat_all)
         GLCM_feat = GLCM_feat_all{prop};
+        switch GLCM_feat
         % Autocorrelation
-        if(strcmp(GLCM_feat,'autoc')==1)    
-            feature(prop) = sum(sum(Pij.*(i.*j))); 
+            case 'autoc'    
+                feature(prop) = sum(sum(Pij.*(i.*j))); 
         % Contrast 
-        elseif(strcmp(GLCM_feat,'contr')==1)
-            feature(prop) = sum(sum((abs(i-j).^2).*Pij)); 
+            case'contr'
+                feature(prop) = sum(sum((abs(i-j).^2).*Pij)); 
         % Dissimilarity 
-        elseif(strcmp(GLCM_feat,'dissi')==1)
-            feature(prop) = sum(sum(abs(i-j).*Pij)); 
+            case 'dissi'
+                feature(prop) = sum(sum(abs(i-j).*Pij)); 
         % Energy 
-        elseif(strcmp(GLCM_feat,'energ')==1)
-            feature(prop) = sum(sum(Pij.^2)); 
+            case 'energ' 
+                feature(prop) = sum(sum(Pij.*Pij)); 
         % Entropy 
-        elseif(strcmp(GLCM_feat,'entro')==1)
-            feature(prop) = -sum(sum(Pij.*log(Pij+eps))); 
+            case 'entro'
+                feature(prop) = -sum(sum(Pij.*log(Pij+eps))); 
         % Homogeneity Matlab 
-        elseif(strcmp(GLCM_feat,'homom')==1)
-            feature(prop) =  sum(sum(Pij./(1+abs(i-j)))); 
+            case 'homom'
+                feature(prop) =  sum(sum(Pij./(1+abs(i-j)))); 
         % Homogeneity Paper 
-        elseif(strcmp(GLCM_feat,'homop')==1)
-            feature(prop) = sum(sum(Pij./(1+abs(i-j).^2))); 
+            case 'homop'
+                feature(prop) = sum(sum(Pij./(1+abs(i-j).^2))); 
         % Sum of squares: Variance 
-        elseif(strcmp(GLCM_feat,'sosvh')==1)
-            feature(prop) = sum(sum(Pij.*((j-glcm_mean).^2))); 
+            case 'sosvh'
+                feature(prop) = sum(sum(Pij.*((j-glcm_mean).*(j-glcm_mean)))); 
         % Inverse difference normalized 
-        elseif(strcmp(GLCM_feat,'indnc')==1)
-            feature(prop) = sum(sum(Pij./(1+(abs(i-j)./size_glcm_1)))); 
+            case 'indnc'
+                feature(prop) = sum(sum(Pij./(1+(abs(i-j)./size_glcm_1)))); 
         % Inverse difference moment normalized 
-        elseif(strcmp(GLCM_feat,'idmnc')==1)
-            feature(prop) = sum(sum(Pij./(1+((i-j)./size_glcm_1).^2))); 
+            case 'idmnc'
+                feature(prop) = sum(sum(Pij./(1+((i-j)./size_glcm_1).^2))); 
         % Maximum probability 
-        elseif(strcmp(GLCM_feat,'maxpr')==1)
-            feature(prop) = max(Pij(:)); 
+            case 'maxpr'
+                feature(prop) = max(Pij(:)); 
         % Sum average 
-        elseif(strcmp(GLCM_feat,'savgh')==1)
-            feature(prop) = sum((ii+1).*p_xplusy); 
+            case 'savgh'
+                feature(prop) = sum((ii+1).*p_xplusy); 
         % Sum entropy 
-        elseif(strcmp(GLCM_feat,'senth')==1)
-            feature(prop) = -sum(p_xplusy.*log(p_xplusy+eps));     
+            case 'senth'
+                feature(prop) = -sum(p_xplusy.*log(p_xplusy+eps));     
         % Sum variance 
-        elseif(strcmp(GLCM_feat,'svarh')==1)
-            senth = -sum(p_xplusy.*log(p_xplusy+eps)); 
-            feature(prop) = sum((((ii+1) - senth).^2).*p_xplusy); 
+            case 'svarh'
+                senth = -sum(p_xplusy.*log(p_xplusy+eps)); 
+                feature(prop) = sum((((ii+1) - senth).^2).*p_xplusy); 
         % Difference entropy 
-        elseif(strcmp(GLCM_feat,'denth')==1)
+            case 'denth'
             feature(prop) = -sum(p_xminusy.*log(p_xminusy+eps)); 
         % Difference variance 
-        elseif(strcmp(GLCM_feat,'dvarh')==1)
-            feature(prop) = sum((jj.^2).*p_xminusy); 
+            case 'dvarh'
+                feature(prop) = sum((jj.*jj).*p_xminusy); 
         % Correlation Matlab     
-        elseif(strcmp(GLCM_feat,'corrm')==1)
-            corm = sum(sum(Pij.*(i-u_x).*(j-u_y))); 
-            feature(prop) = corm/(s_x*s_y); 
+            case 'corrm'
+                corm = sum(sum(Pij.*(i-u_x).*(j-u_y))); 
+                feature(prop) = corm/(s_x*s_y); 
         % Correlation paper 
-        elseif(strcmp(GLCM_feat,'corrp')==1)
-            corp = sum(sum(Pij.*(i.*j))); 
-            feature(prop) = (corp-u_x*u_y)/(s_x*s_y); 
+            case 'corrp'
+                corp = sum(sum(Pij.*(i.*j))); 
+                feature(prop) = (corp-u_x*u_y)/(s_x*s_y); 
         % Cluster Prominence 
-        elseif(strcmp(GLCM_feat,'cprom')==1)
-            feature(prop) = sum(sum(Pij.*((i+j-u_x-u_y).^4))); 
+            case 'cprom' 
+                feature(prop) = sum(sum(Pij.*((i+j-u_x-u_y).^4))); 
         % Cluster Shade    
-        elseif(strcmp(GLCM_feat,'cshad')==1)
-            feature(prop) = sum(sum(Pij.*((i+j-u_x-u_y).^3)));   
+            case 'cshad'
+                feature(prop) = sum(sum(Pij.*((i+j-u_x-u_y).^3)));   
         % Information measure of correlation 1 
-        elseif(strcmp(GLCM_feat,'inf1h')==1)
-            hx = -sum(p_x.*log(p_x+eps)); 
-            hy = -sum(p_y.*log(p_y+eps)); 
-            hxy = -sum(sum(Pij.*log(Pij+eps))); 
-            hxy1 = -sum(sum(Pij.*log(p_x*p_y' + eps))); 
-            feature(prop) = (hxy-hxy1)/(max([hx,hy])); 
+            case 'inf1h'
+                hx = -sum(p_x.*log(p_x+eps)); 
+                hy = -sum(p_y.*log(p_y+eps)); 
+                hxy = -sum(sum(Pij.*log(Pij+eps))); 
+                hxy1 = -sum(sum(Pij.*log(p_x*p_y' + eps))); 
+                feature(prop) = (hxy-hxy1)/(max([hx,hy])); 
         % Information measure of correlation 2
-        elseif(strcmp(GLCM_feat,'inf2h')==1)
-            hxy = -sum(sum(Pij.*log(Pij+eps))); 
-            hxy2 = -sum(sum((p_x*p_y').*log(p_x*p_y' + eps))); 
-            feature(prop) = (1-exp(-2*(hxy2-hxy)))^0.5;     
+            case 'inf2h'
+                hxy = -sum(sum(Pij.*log(Pij+eps))); 
+                hxy2 = -sum(sum((p_x*p_y').*log(p_x*p_y' + eps))); 
+                feature(prop) = (1-exp(-2*(hxy2-hxy)))^0.5;     
         end  
     end
     feature(isnan(feature)) = 0;
@@ -270,6 +314,27 @@ disp(size(InsideMask));
 glcm = zeros(length(InsideMask),NL,NL,'single');
 fprintf('Computing GLCM: ')
 n=0;
+
+% Pre-allocate glcm_temp as a cell array to avoid slice issues
+glcm_temp = cell(NL, 1);
+parfor i = 1:NL
+    glcm_i = zeros(size(glcm, 1), NL);  % temp storage for this i-slice
+    
+    for j = 1:NL
+        G = zeros(size(InsideMask), 'uint8');
+        G(InsideMask) = vol_Gray(OffsetsMatrixS(InsideMask)) == i & ...
+                        vol_Gray(OffsetsMatrixE(InsideMask)) == j;
+        glcm_i(:, j) = sum(sum(G, 3), 2);
+    end
+    
+    glcm_temp{i} = glcm_i;
+end
+
+% Reassemble glcm from cell array
+for i = 1:NL
+    glcm(:, i, :) = glcm_temp{i};
+end
+%{
 for i=1:NL
     for j=1:NL
         G = zeros(size(InsideMask),'uint8');
@@ -281,6 +346,7 @@ for i=1:NL
     fprintf([msg '%%']);
     n=numel(msg)+1;                    
 end
+%}
 fprintf('\n');
 clear vol_Gray;
 norm_fact = sum(sum(glcm,3),2);
