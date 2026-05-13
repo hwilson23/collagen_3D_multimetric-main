@@ -22,10 +22,20 @@ def reshape_CA(df):
     return pivotdf
 
 def reshape_texture(df):
+    # List of all possible value columns
+    possible_values = ["concentration", "type", "roi", "texture_mean", "texture_median", "texture_std"]
+    
+    # Filter to only include columns that exist in the dataframe
+    available_values = [col for col in possible_values if col in df.columns]
+    
+    if not available_values:
+        # If no values are available, just return the dataframe as-is
+        return df
+    
     pivotdf = df.pivot(
         index="image_name",
         columns = "texture_type",
-        values = ["concentration","type","roi","texture_mean","texture_median","texture_std"]
+        values = available_values
     )
     pivotdf.columns = [f"{stat}_{tex}" for stat,tex in pivotdf.columns]
     pivotdf = pivotdf.reset_index()
