@@ -80,21 +80,21 @@ def image_stats_glcm2D(imagepath, stackstats):
     return stackstats
 
 def image_stats_glcm3D(imagepath, stackstats):
+    nospace_name = os.path.basename(imagepath).replace(" ","")
     img = tiff.imread(imagepath)
     img = np.moveaxis(img,0,-1)
     #print(f"im shape {img.shape}")
        
 
     #index of end filename
-    idx = os.path.basename(imagepath).find(".tif")
+    idx = os.path.basename(imagepath).find("8bit.ome")
     #print(os.path.basename(imagepath)[:idx+8])
     
     for z in range(img.shape[2]):
         currentim = img[:,:,z]
-        nospace_name = os.path.basename(imagepath).replace(" ","")
         imgstats = {
             "slice" : z+1,
-            "image_name": nospace_name[:idx+len(".tif")],
+            "image_name": nospace_name[:idx+len("8bit.ome")],
             "texture_type": nospace_name.split('_')[-4], 
             "concentration": nospace_name.split('_')[2], 
             "type": nospace_name.split('_')[1],
@@ -122,7 +122,7 @@ def process_img_folder(folder, is_3d):
                 full = os.path.join(folder,file)
                 stats = image_stats_glcm3D(full,stackstats)
             
-            #print(results)
+            #print(stats)
     return pd.DataFrame(stats)
 
 def extract_stack_key(filename):
@@ -201,7 +201,6 @@ dftexture = process_img_folder("G:/FluorescentCollagen/20260427_flucol_ows3/2026
 dftexture= reshape_texture(dftexture)
 
 dftexture3D = process_img_folder("G:\\FluorescentCollagen\\20260427_flucol_ows3\\20260427_texturemapdata\\texture_3d_matlab",is_3d = 1)
-print(dftexture3D.head())
 dftexture3D = reshape_texture(dftexture3D)
 
 
