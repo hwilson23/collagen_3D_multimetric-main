@@ -128,10 +128,22 @@ parfor v = 1:nVoxels
     glcm_norm = squeeze(glcm(vi(v),vj(v),vk(v),:,:));
     featresults(v,:) = computeFeature(glcm_norm, GLCM_feat);
 end
+% Build linear indices for the first 3 dims
+linIdx = sub2ind(size(texture(:,:,:,1)), vi, vj, vk);  % [nVoxels x 1]
+
+% Vectorized write across all features at once
+nFeats = length(GLCM_feat);
+nTotal = numel(texture(:,:,:,1));
+
+% Expand linear indices across feature dimension
+allIdx = linIdx + nTotal * (0:nFeats-1);  % [nVoxels x nFeats]
+
+texture(allIdx) = featresults;  % single vectorized assignment
+%{
 for v = 1:nVoxels
     texture(vi(v),vj(v),vk(v),:) = featresults(v,:);
 end
-
+%}
 
 %%old version for gpu/regular cpu converting - without allocation for
 %%parfor
@@ -154,7 +166,7 @@ for i=1:size(glcm,1)
     n=numel(msg)+1;                    
 end
 %}
-texture = gather(texture);
+
 disp("done with compute fetures")
 end
 %{
