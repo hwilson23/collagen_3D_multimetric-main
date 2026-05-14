@@ -202,6 +202,7 @@ dftexture = process_img_folder("G:/FluorescentCollagen/20260427_flucol_ows3/2026
 dftexture= reshape_texture(dftexture)
 
 dftexture3D = process_img_folder("G:\\FluorescentCollagen\\20260427_flucol_ows3\\20260427_texturemapdata\\texture_3d_matlab",is_3d = 1)
+#dftexture3D = process_img_folder("G:\\FluorescentCollagen\\20260427_flucol_ows3\\20260427_texturemapdata\\texture_3d_matlab_n2", is_3d= 1)
 dftexture3D = reshape_texture(dftexture3D)
 
 
