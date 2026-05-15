@@ -8,18 +8,18 @@
 
 %user input
 
-%if isempty(gcp('nocreate'))
- %   parpool('local');
-%end
+if isempty(gcp('nocreate'))
+    parpool('local');
+end
 
 OPT.D = 1;                  % distance for offset computation
 OPT.NeighborSize = 1;       % neighborhood radius
 OPT.quantLevel = 8;        % number of gray level bins 
 OPT.glcm_properties = {'autoc','contr','corrm','corrp','cprom','cshad','dissi','energ','entro','homom','homop','maxpr','sosvh','savgh','svarh','senth','dvarh','denth','inf1h','inf2h','indnc','idmnc'};  % features to compute
-folder = "C:\Users\hwilson23\Documents\Helen\texturemap";
+folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\testbatch";
 %folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata";
 %folder = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\test_groundtruthdata";
-outpath = "C:\Users\hwilson23\Documents\Helen\texture3d_TOP";
+outpath = "G:\FluorescentCollagen\20260427_flucol_ows3\20260427_texturemapdata\texture_3d_TOP_out";
 cd(folder)
 %load file
 
@@ -167,16 +167,18 @@ p_y = squeeze(sum(Pij,1))';
 glcm_mean = mean(Pij(:)); 
 idx1 = (i+j)-1; 
 p_xplusy = zeros((2*size_glcm_1 - 1),1);
-for aux = 1:max(idx1(:)) 
-    p_xplusy(aux) = sum(Pij(idx1==aux)); 
-end 
+%for aux = 1:max(idx1(:)) 
+    %p_xplusy(aux) = sum(Pij(idx1==aux)); 
+    p_xplusy = accumarray(idx1(:),Pij(:));
+%end 
 ii = (1:(2*size_glcm_1-1))'; 
 jj = (0:size_glcm_1-1)';
 idx2 = abs(i-j)+1; 
 p_xminusy = zeros((size_glcm_1),1);
-for aux = 1:max(idx2(:)) 
-    p_xminusy(aux) = sum(Pij(idx2==aux)); 
-end 
+%parfor aux = 1:max(idx2(:)) 
+ %   p_xminusy(aux) = sum(Pij(idx2==aux));
+     p_xminusy = accumarray(idx2(:),Pij(:));
+%end 
 
 u_x = sum(sum(i.*Pij)); 
 u_y = sum(sum(j.*Pij));     
